@@ -1,0 +1,41 @@
+name: INCY Release Monitor
+
+on:
+  schedule:
+    # Запуск каждые 60 минут (в начале каждого часа)
+    - cron: '0 * * * *'
+  workflow_dispatch:
+    inputs:
+      send_summary:
+        description: 'Прислать сводку всех актуальных версий в Telegram прямо сейчас'
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  check-updates:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Скачивание репозитория
+        uses: actions/checkout@v4
+
+      - name: Проверка версий INCY
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          ADMIN_CHAT_ID: ${{ secrets.ADMIN_CHAT_ID }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FORCE_SUMMARY: ${{ github.event.inputs.send_summary || 'false' }}
+        run: python3 check_updates.py
+
+      - name: Сохранение обновлённых версий в репозиторий
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add state.json || true
+          if ! git diff --staged --quiet; then
+            git commit -m "chore: update INCY versions state"
+            git push
+          fi
